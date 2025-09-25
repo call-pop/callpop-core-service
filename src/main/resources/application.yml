@@ -1,0 +1,26 @@
+spring:
+  datasource:
+    url:
+    username:
+    password:
+    driver-class-name:
+  jpa:
+    database-platform:
+    open-in-view:
+    hibernate:
+      ddl-auto:
+
+logging:
+  pattern:
+    level: "%5p [${spring.application.name:},%X{traceId:-},%X{spanId:-}]"
+  level:
+    web: INFO
+    com:
+      raonsecure:
+        odi:
+          tenantadmin: debug
+    org.hibernate:
+      orm.jdbc.bind: warn
+
+jwt:
+  secret: ${JWT_SECRET:}

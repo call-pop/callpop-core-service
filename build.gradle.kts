@@ -1,5 +1,3 @@
-import org.springframework.boot.gradle.tasks.bundling.BootJar
-
 plugins {
     java
     id("org.springframework.boot") version "3.3.4"
@@ -38,7 +36,7 @@ dependencies {
     implementation("com.github.spotbugs:spotbugs-annotations:${spotbugsVersion}")
 
     runtimeOnly("com.h2database:h2") // 로컬 테스트
-    // runtimeOnly("org.postgresql:postgresql") // 운영
+    runtimeOnly("org.mariadb.jdbc:mariadb-java-client") // 운영 DB
 
     //jasypt
     implementation("com.github.ulisesbocchio:jasypt-spring-boot-starter:${jasyptVersion}")

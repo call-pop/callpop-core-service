@@ -9,16 +9,19 @@ import org.springframework.web.socket.config.annotation.WebSocketMessageBrokerCo
 @EnableWebSocketMessageBroker
 @Configuration
 public class WebSocketConfig implements WebSocketMessageBrokerConfigurer {
-
     @Override
     public void configureMessageBroker(MessageBrokerRegistry config) {
-        config.enableSimpleBroker("/topic"); // 클라이언트가 구독할 수 있는 엔드포인트 설정
-        config.setApplicationDestinationPrefixes("/app"); // 클라이언트가 메시지를 보낼 때 사용할 접두사 설정
+        // 구독 엔드포인트
+        config.enableSimpleBroker("/topic", "/queue");
+        // 클라이언트가 보낼 prefix (MessageMapping)
+        config.setApplicationDestinationPrefixes("/app");
+        // 1:1 DM 같은 유저별 큐용
+        config.setUserDestinationPrefix("/user");
     }
 
     @Override
     public void registerStompEndpoints(StompEndpointRegistry registry) {
-        registry.addEndpoint("/ws") // 웹소켓 엔드포인트 설정
+        registry.addEndpoint("/ws")
                 .setAllowedOriginPatterns("*") // 모든 도메인 허용 todo 추후 변경
                 .withSockJS();
     }
