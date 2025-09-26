@@ -29,8 +29,9 @@ public class ChatMessage {
     @JoinColumn(name = "room_id", nullable = false)
     private ChatRoom chatRoom;
 
-    @Column(nullable = false)
-    private String senderId; // 보낸 사람 userId
+    @ManyToOne(fetch = FetchType.LAZY, optional = false)
+    @JoinColumn(name = "sender_id", nullable = false)
+    private Users sender;
 
     @Column(nullable = false, columnDefinition = "TEXT")
     private String content;
@@ -40,12 +41,12 @@ public class ChatMessage {
 
     public static ChatMessage create(
             ChatRoom room,
-            String senderId,
+            Users user,
             String content
     ) {
         ChatMessage message = new ChatMessage();
         message.setChatRoom(room);
-        message.setSenderId(senderId);
+        message.setSender(user);
         message.setContent(content);
         message.setSentAt(Instant.now());
         room.getMessages().add(message);

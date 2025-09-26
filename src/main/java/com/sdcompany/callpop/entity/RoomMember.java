@@ -29,17 +29,17 @@ public class RoomMember {
     @JoinColumn(name = "room_id", nullable = false)
     private ChatRoom chatRoom;
 
-    @Column(nullable = false)
-    private String userId; // 유저 고유 ID
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "user_id", nullable = false)
+    private Users user;
 
     // 이 멤버가 마지막으로 읽은 메시지 시각
     @Column(nullable = false)
-    private Instant lastReadAt = Instant.EPOCH;
+    private Instant lastReadDate = Instant.EPOCH;
 
     public static void updateLastRead(
-            RoomMember member,
-            long readAtEpochMillis
+            RoomMember member
     ) {
-        member.setLastReadAt(Instant.ofEpochMilli(readAtEpochMillis));
+        member.setLastReadDate(Instant.now());
     }
 }

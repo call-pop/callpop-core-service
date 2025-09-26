@@ -1,6 +1,8 @@
-package com.sdcompany.callpop.config;
+package com.sdcompany.callpop.config.websocket;
 
+import lombok.RequiredArgsConstructor;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.messaging.simp.config.ChannelRegistration;
 import org.springframework.messaging.simp.config.MessageBrokerRegistry;
 import org.springframework.web.socket.config.annotation.EnableWebSocketMessageBroker;
 import org.springframework.web.socket.config.annotation.StompEndpointRegistry;
@@ -8,7 +10,11 @@ import org.springframework.web.socket.config.annotation.WebSocketMessageBrokerCo
 
 @EnableWebSocketMessageBroker
 @Configuration
+@RequiredArgsConstructor
 public class WebSocketConfig implements WebSocketMessageBrokerConfigurer {
+
+    private final JwtAuthChannelInterceptor jwtAuthChannelInterceptor;
+
     @Override
     public void configureMessageBroker(MessageBrokerRegistry config) {
         // 구독 엔드포인트
@@ -24,5 +30,13 @@ public class WebSocketConfig implements WebSocketMessageBrokerConfigurer {
         registry.addEndpoint("/ws")
                 .setAllowedOriginPatterns("*") // 모든 도메인 허용 todo 추후 변경
                 .withSockJS();
+
+        // todo 에러 핸들러 등록
+//        registry.setErrorHandler();
+    }
+
+    @Override
+    public void configureClientInboundChannel(ChannelRegistration registration) {
+        registration.interceptors(jwtAuthChannelInterceptor);
     }
 }

@@ -2,6 +2,7 @@ plugins {
     java
     id("org.springframework.boot") version "3.3.4"
     id("io.spring.dependency-management") version "1.1.6"
+    id("org.springdoc.openapi-gradle-plugin") version "1.6.0"
 }
 
 group = "com.sdcompany.callpop"
@@ -21,6 +22,7 @@ val jjwtVersion = "0.11.5"
 val mamStructVersion = "1.5.3.Final"
 val spotbugsVersion = "4.9.3"
 val springCloudVersion = "2023.0.3"
+val openapiVersion = "2.1.0"
 
 dependencies {
     implementation("org.springframework.boot:spring-boot-starter-web")
@@ -29,6 +31,9 @@ dependencies {
     implementation("org.springframework.boot:spring-boot-starter-data-jpa")
     implementation("org.springframework.boot:spring-boot-starter-security")
     implementation("org.springframework.boot:spring-boot-starter-json")
+
+    // open api
+    implementation("org.springdoc:springdoc-openapi-starter-webmvc-ui:${openapiVersion}")
 
     implementation("org.springframework.cloud:spring-cloud-starter-openfeign")
 
