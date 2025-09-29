@@ -3,11 +3,10 @@ server:
 
 spring:
   datasource:
-    url: jdbc:h2:mem:callpop;MODE=MySQL
+    url: jdbc:h2:file:./.h2/callpop;MODE=MySQL
     username: sa
     password:
     driver-class-name: org.h2.Driver
-
   jpa:
     open-in-view: false
     database-platform: org.hibernate.dialect.H2Dialect
@@ -16,7 +15,7 @@ spring:
     properties:
       hibernate:
         format_sql: true
-        show_sql: false
+        show_sql: true
     defer-datasource-initialization: true
 
   h2:
@@ -33,6 +32,7 @@ logging:
     level: "%5p [${spring.application.name:},%X{traceId:-},%X{spanId:-}]"
   level:
     org.hibernate.orm.jdbc.bind: warn
+    org.springframework.security: debug
 
 jwt:
   secret-key: kE6uR0Wm42F+YOOsuDvTuuV1vAJrqZ45+9jE4y/tEPpuKWmSnYIIW3I5vFoFnKwuj4wWgn34E6OsN78K+RJhYg==

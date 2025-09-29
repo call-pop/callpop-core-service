@@ -14,15 +14,18 @@ import org.springframework.web.socket.config.annotation.WebSocketMessageBrokerCo
 public class WebSocketConfig implements WebSocketMessageBrokerConfigurer {
 
     private final JwtAuthChannelInterceptor jwtAuthChannelInterceptor;
+    private static final String[] ENDPOINT = {"/topic", "/queue"};
+    private static final String APP_PREFIX = "/app";
+    private static final String USER_PREFIX = "/user";
 
     @Override
     public void configureMessageBroker(MessageBrokerRegistry config) {
         // 구독 엔드포인트
-        config.enableSimpleBroker("/topic", "/queue");
+        config.enableSimpleBroker(ENDPOINT);
         // 클라이언트가 보낼 prefix (MessageMapping)
-        config.setApplicationDestinationPrefixes("/app");
+        config.setApplicationDestinationPrefixes(APP_PREFIX);
         // 1:1 DM 같은 유저별 큐용
-        config.setUserDestinationPrefix("/user");
+        config.setUserDestinationPrefix(USER_PREFIX);
     }
 
     @Override

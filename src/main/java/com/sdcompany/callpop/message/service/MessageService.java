@@ -4,6 +4,7 @@ import com.sdcompany.callpop.entity.ChatMessage;
 import com.sdcompany.callpop.entity.ChatRoom;
 import com.sdcompany.callpop.entity.RoomMember;
 import com.sdcompany.callpop.entity.Users;
+import com.sdcompany.callpop.login.dto.CallPopUser;
 import com.sdcompany.callpop.message.dto.ChatMessageRequest;
 import com.sdcompany.callpop.message.dto.ChatMessageResponse;
 import com.sdcompany.callpop.message.dto.ReadReceiptEvent;
@@ -14,8 +15,6 @@ import com.sdcompany.callpop.message.repository.UsersRepository;
 import jakarta.transaction.Transactional;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
-
-import java.security.Principal;
 
 @Service
 @RequiredArgsConstructor
@@ -29,13 +28,11 @@ public class MessageService {
     public ChatMessageResponse saveAndBuildResponse(
             Long roomId,
             ChatMessageRequest request,
-            Principal principal
+            CallPopUser principal
     ) {
 
-        ChatRoom room = chatRoomRepository.findById(roomId).orElseThrow();
-
-        Users user = usersRepository.findById(Long.valueOf(principal.getName()))
-                .orElseThrow();
+        ChatRoom room = getChatRoom(roomId);
+        Users user = getUser(principal.getId());
 
         ChatMessage message = ChatMessage.create(
                 room, user, request.content()
@@ -55,18 +52,29 @@ public class MessageService {
     @Transactional
     public ReadReceiptEvent updateLastReadAndBuildEvent(
             Long roomId,
-            Principal principal
+            CallPopUser callPopUser
     ) {
-        ChatRoom room = chatRoomRepository.findById(roomId).orElseThrow();
-
-        Users user = usersRepository.findById(Long.valueOf(principal.getName()))
-                .orElseThrow();
-
-        RoomMember member = roomMemberRepository.findByChatRoomAndUser(room, user)
-                        .orElseThrow();
+        ChatRoom room = getChatRoom(roomId);
+        Users user = getUser(callPopUser.getId());
+        RoomMember member = getMember(room, user);
 
         RoomMember.updateLastRead(member);
 
         return new ReadReceiptEvent(roomId);
+    }
+
+    private RoomMember getMember(ChatRoom room, Users user) {
+        return roomMemberRepository.findByChatRoomAndUser(room, user)
+                .orElseThrow();
+    }
+
+    private ChatRoom getChatRoom(Long roomId) {
+        return chatRoomRepository.findById(roomId)
+                .orElseThrow();
+    }
+
+    private Users getUser(Long userId) {
+        return usersRepository.findById(userId)
+                .orElseThrow();
     }
 }

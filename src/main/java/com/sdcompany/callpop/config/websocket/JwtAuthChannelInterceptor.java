@@ -1,6 +1,8 @@
 package com.sdcompany.callpop.config.websocket;
 
 import com.sdcompany.callpop.config.security.TokenProvider;
+import com.sdcompany.callpop.login.dto.CallPopUser;
+import io.jsonwebtoken.Claims;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpHeaders;
 import org.springframework.messaging.Message;
@@ -14,6 +16,7 @@ import org.springframework.security.authentication.UsernamePasswordAuthenticatio
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.stereotype.Component;
 
+import java.util.Collections;
 import java.util.List;
 
 @Component
@@ -27,23 +30,31 @@ public class JwtAuthChannelInterceptor implements ChannelInterceptor {
         StompHeaderAccessor headerAccessor = MessageHeaderAccessor.getAccessor(message, StompHeaderAccessor.class);
         if (headerAccessor == null) return message;
 
-        // CONNECT 때 Authorization 헤더에서 토큰 추출/검증
         if (StompCommand.CONNECT.equals(headerAccessor.getCommand())) {
             String token = firstHeader(headerAccessor, HttpHeaders.AUTHORIZATION);
             if (token == null) throw new MessageDeliveryException("No Authorization header");
 
             if (token.startsWith("Bearer ")) token = token.substring(7);
 
-            if (token != null && !token.isBlank()) {
-                String subject = tokenProvider.validateTokenAndGetSubject(token); // 실패 시 예외 발생 → 연결 거부
-                var auth = new UsernamePasswordAuthenticationToken(
-                        subject, null, List.of(new SimpleGrantedAuthority("ROLE_USER"))
-                );
-                headerAccessor.setUser(auth);
-            }
+            // 토큰 검증 + 클레임 파싱
+            Claims claims = tokenProvider.parseClaims(token);
+            Long userId = Long.valueOf(claims.getSubject());
+            String userIdentifier = claims.get("userIdentifier", String.class);
+
+            @SuppressWarnings("unchecked")
+            List<String> roles = claims.get("roles", List.class);
+            if (roles == null) roles = Collections.singletonList("ROLE_USER");
+
+            var authorities = roles.stream()
+                    .map(SimpleGrantedAuthority::new)
+                    .toList();
+
+            CallPopUser callPopUser = new CallPopUser(userId, userIdentifier, authorities);
+
+            var authentication = new UsernamePasswordAuthenticationToken(callPopUser, null, authorities);
+            headerAccessor.setUser(authentication);
         }
 
-        // SEND 시에도 인증 여부 체크
         if (StompCommand.SEND.equals(headerAccessor.getCommand()) && headerAccessor.getUser() == null) {
             throw new MessageDeliveryException("Unauthorized SEND");
         }

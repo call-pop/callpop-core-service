@@ -1,0 +1,341 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8" />
+  <title>타닥타닥 Chat</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <!-- SockJS + STOMP -->
+  <script src="https://cdn.jsdelivr.net/npm/sockjs-client@1/dist/sockjs.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@stomp/stompjs@7/bundles/stomp.umd.min.js"></script>
+  <style>
+    :root { font-family: -apple-system, BlinkMacSystemFont, Segoe UI, Roboto, 'Noto Sans KR', sans-serif; }
+    * { box-sizing: border-box; }
+    body { margin: 0; background: #f6f7fb; color:#0f172a; }
+    header { padding: 12px 16px; background: #0ea5e9; color:#fff; }
+    .wrap { display: grid; grid-template-columns: 320px 1fr; gap: 0; min-height: calc(100dvh - 56px);}
+    .left { border-right: 1px solid #e5e7eb; background:#fff; display:flex; flex-direction:column; }
+    .right { display:flex; flex-direction:column; }
+    .panel { padding: 12px; }
+    .row { display:flex; gap:8px; align-items:center; margin:6px 0; }
+    input, button { padding: 8px 10px; border-radius: 8px; border:1px solid #cbd5e1; }
+    input:focus { outline: none; border-color:#0ea5e9; box-shadow: 0 0 0 3px rgba(14,165,233,.15); }
+    button { background: #0ea5e9; color:#fff; border:0; cursor:pointer; }
+    button.secondary { background:#64748b; }
+    button.ghost { background:#fff; color:#0f172a; border:1px solid #cbd5e1; }
+    button:disabled { opacity:.6; cursor:not-allowed; }
+    .rooms { overflow:auto; padding:8px; }
+    .room { padding:10px; border-radius:10px; border:1px solid #e5e7eb; margin-bottom:8px; cursor:pointer; background:#fff; }
+    .room.active { border-color:#0ea5e9; box-shadow:0 0 0 3px rgba(14,165,233,.12); }
+    .room .name { font-weight:700; }
+    .room small { color:#64748b; display:block; margin-top:4px; }
+    .status { font-size:12px; color:#475569; margin-left:auto; }
+    .chat { display:flex; flex-direction:column; height:100%; }
+    .messages { flex:1; overflow:auto; padding: 12px; }
+    .msg { max-width: 70%; padding:10px 12px; border-radius: 12px; margin: 6px 0; background:#e2e8f0; }
+    .msg.me { margin-left:auto; background:#d1fae5; }
+    .composer { border-top:1px solid #e5e7eb; padding:10px; display:flex; gap:8px; }
+    .muted { color:#64748b; }
+    .pill { display:inline-block; font-size:12px; padding:2px 6px; border-radius:999px; background:#e2e8f0; margin-right:6px; }
+    .connect-bar { display:flex; gap:8px; align-items:center; }
+    .hr { height:1px; background:#e5e7eb; margin:8px 0; }
+  </style>
+</head>
+<body>
+<header>
+  <div style="display:flex;align-items:center;gap:8px;">
+    <strong>CallPop Chat</strong>
+    <span id="wsStatus" class="pill" style="background:#334155;color:#fff;">WS: DISCONNECTED</span>
+    <span id="userInfo" class="pill">User: (JWT)</span>
+  </div>
+</header>
+
+<div class="wrap">
+  <!-- Left: Controls & Room list -->
+  <aside class="left">
+    <div class="panel">
+      <div class="row">
+        <input id="baseUrl" type="text" placeholder="http://localhost:8080" style="flex:1" />
+      </div>
+      <div class="row">
+        <input id="jwt" type="text" placeholder="JWT 토큰 (Bearer 없이)" style="flex:1" />
+      </div>
+      <div class="row connect-bar">
+        <button id="btnFetchRooms" class="ghost">내 채팅방 불러오기</button>
+        <button id="btnConnect" class="">WS 연결</button>
+        <button id="btnDisconnect" class="secondary" disabled>WS 해제</button>
+        <span id="restStatus" class="status">REST: idle</span>
+      </div>
+      <div class="hr"></div>
+    </div>
+
+    <div class="rooms" id="roomList"></div>
+  </aside>
+
+  <!-- Right: Chat -->
+  <main class="right">
+    <div class="panel" style="display:flex; align-items:center; gap:8px;">
+      <div class="pill">현재 방</div>
+      <strong id="currentRoomName">-</strong>
+      <span id="currentRoomId" class="muted" style="margin-left:auto;">roomId: -</span>
+    </div>
+    <div class="chat">
+      <div id="messages" class="messages"></div>
+      <div class="composer">
+        <input id="msgInput" type="text" placeholder="메시지를 입력하세요" style="flex:1" />
+        <button id="btnSend">전송</button>
+        <button id="btnRead" class="ghost">읽음</button>
+      </div>
+    </div>
+  </main>
+</div>
+
+<script>
+  // DOM refs
+  const baseUrlEl = document.getElementById('baseUrl');
+  const jwtEl = document.getElementById('jwt');
+  const btnFetchRooms = document.getElementById('btnFetchRooms');
+  const btnConnect = document.getElementById('btnConnect');
+  const btnDisconnect = document.getElementById('btnDisconnect');
+  const roomListEl = document.getElementById('roomList');
+  const wsStatusEl = document.getElementById('wsStatus');
+  const restStatusEl = document.getElementById('restStatus');
+  const userInfoEl = document.getElementById('userInfo');
+  const currentRoomNameEl = document.getElementById('currentRoomName');
+  const currentRoomIdEl = document.getElementById('currentRoomId');
+  const messagesEl = document.getElementById('messages');
+  const msgInputEl = document.getElementById('msgInput');
+  const btnSend = document.getElementById('btnSend');
+  const btnRead = document.getElementById('btnRead');
+
+  // State
+  let rooms = [];
+  let activeRoom = null;
+  let client = null;                 // STOMP client (global)
+  let subs = [];                     // current subscriptions
+  let meUserId = null;               // JWT subject (선택사항)
+  let meUserIdentifier = null;       // JWT claim (선택사항)
+
+  // Helpers
+  const getBaseUrl = () => (baseUrlEl.value || window.location.origin).replace(/\/$/, '');
+
+  function setWsStatus(connected) {
+    wsStatusEl.textContent = connected ? 'WS: CONNECTED' : 'WS: DISCONNECTED';
+    wsStatusEl.style.background = connected ? '#16a34a' : '#334155';
+    btnConnect.disabled = connected;
+    btnDisconnect.disabled = !connected;
+  }
+
+  function setRestStatus(text) {
+    restStatusEl.textContent = 'REST: ' + text;
+  }
+
+  function parseJwtClaims() {
+    const token = jwtEl.value.trim();
+    if (!token) {
+      userInfoEl.textContent = 'User: (JWT 미입력)';
+      meUserId = null;
+      meUserIdentifier = null;
+      return;
+    }
+    try {
+      // 단순 디코딩(검증 아님) – payload 파싱해서 사용자 정보 표시에만 사용
+      const payload = JSON.parse(atob(token.split('.')[1]));
+      meUserId = payload.sub || null;
+      meUserIdentifier = payload.userIdentifier || null;
+      userInfoEl.textContent = `User: ${meUserIdentifier ?? meUserId ?? '(알수없음)'}`;
+    } catch (e) {
+      userInfoEl.textContent = 'User: (JWT 파싱 실패)';
+      meUserId = null;
+      meUserIdentifier = null;
+    }
+  }
+
+  function renderRooms() {
+    roomListEl.innerHTML = '';
+    if (!rooms.length) {
+      roomListEl.innerHTML = '<div class="muted" style="padding:10px;">채팅방이 없습니다.</div>';
+      return;
+    }
+    rooms.forEach(r => {
+      const div = document.createElement('div');
+      div.className = 'room' + (activeRoom && activeRoom.id === r.id ? ' active' : '');
+      div.innerHTML = `
+        <div class="name">${escapeHtml(r.name ?? '(이름 없음)')}</div>
+        <small>ID: ${r.id}</small>
+      `;
+      div.addEventListener('click', () => selectRoom(r));
+      roomListEl.appendChild(div);
+    });
+  }
+
+  function escapeHtml(s) {
+    return String(s).replace(/[&<>"']/g, m => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));
+  }
+
+  function appendMessage({content, senderId, sentAt, mine=false}) {
+    const bubble = document.createElement('div');
+    bubble.className = 'msg' + (mine ? ' me' : '');
+    const time = sentAt ? new Date(sentAt).toLocaleTimeString() : '';
+    bubble.innerHTML = `<div>${escapeHtml(content)}</div>
+                        <div class="muted" style="font-size:12px;margin-top:4px;">${escapeHtml(senderId ?? '')} ${time ? '· ' + time : ''}</div>`;
+    messagesEl.appendChild(bubble);
+    messagesEl.scrollTop = messagesEl.scrollHeight;
+  }
+
+  // REST: 내 채팅방 목록
+  async function fetchRooms() {
+    const base = getBaseUrl();
+    const token = jwtEl.value.trim();
+    setRestStatus('loading...');
+    try {
+      const res = await fetch(`${base}/api/chatrooms/list`, {
+        headers: token ? { 'Authorization': `Bearer ${token}` } : {}
+      });
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      rooms = await res.json(); // [{id, name, ...}]
+      renderRooms();
+      setRestStatus('ok');
+    } catch (e) {
+      console.error(e);
+      setRestStatus('error');
+      alert('채팅방 목록 조회 실패: ' + e.message);
+    }
+  }
+
+  // WS: 연결
+  function connectWs() {
+    const base = getBaseUrl();
+    const token = jwtEl.value.trim();
+    parseJwtClaims();
+
+    if (client && client.active) {
+      alert('이미 연결됨');
+      return;
+    }
+
+    client = new StompJs.Client({
+      webSocketFactory: () => new SockJS(`${base}/ws`),
+      connectHeaders: { 'Authorization': `Bearer ${token}` },
+      debug: str => console.log('[STOMP]', str),
+      reconnectDelay: 3000,
+      onConnect: () => {
+        setWsStatus(true);
+        // 방이 선택되어 있으면 재구독
+        if (activeRoom) subscribeRoom(activeRoom);
+      },
+      onStompError: frame => {
+        console.error('Broker error', frame.headers['message'], frame.body);
+      },
+      onWebSocketClose: () => {
+        setWsStatus(false);
+        subs = [];
+      }
+    });
+
+    client.activate();
+  }
+
+  // WS: 해제
+  function disconnectWs() {
+    if (client && client.active) {
+      subs.forEach(s => { try { s.unsubscribe(); } catch {} });
+      subs = [];
+      client.deactivate();
+    }
+    setWsStatus(false);
+  }
+
+  // 방 선택 + 구독
+  function selectRoom(room) {
+    activeRoom = room;
+    currentRoomNameEl.textContent = room.name ?? '(이름 없음)';
+    currentRoomIdEl.textContent = `roomId: ${room.id}`;
+    renderRooms();
+    messagesEl.innerHTML = ''; // 새 방이므로 메시지 영역 초기화
+    if (client && client.connected) {
+      subscribeRoom(room);
+    }
+  }
+
+  function subscribeRoom(room) {
+    // 이전 구독 제거
+    subs.forEach(s => { try { s.unsubscribe(); } catch {} });
+    subs = [];
+
+    // 서버는 /topic/rooms/{roomId} 로 메시지 broadcast
+    subs.push(client.subscribe(`/topic/rooms/${room.id}`, (msg) => {
+      try {
+        const body = JSON.parse(msg.body);
+        // 서버 응답 스키마: ChatMessageResponse(id, roomId, content, senderId, sentAtEpochMillis)
+        appendMessage({
+          content: body.content,
+          senderId: body.senderId,
+          sentAt: body.sentAtEpochMillis,
+          mine: (meUserIdentifier && body.senderId === meUserIdentifier) || (meUserId && body.senderId === String(meUserId))
+        });
+      } catch {
+        appendMessage({ content: msg.body });
+      }
+    }));
+
+    // 읽음 이벤트
+    subs.push(client.subscribe(`/topic/rooms/${room.id}/read`, (msg) => {
+      console.log('READ event:', msg.body);
+    }));
+  }
+
+  // 메시지 전송
+  function sendMessage() {
+    if (!client || !client.connected) return alert('WS 먼저 연결하세요.');
+    if (!activeRoom) return alert('방을 먼저 선택하세요.');
+    const text = msgInputEl.value.trim();
+    if (!text) return;
+
+    const payload = {content: text};
+    client.publish({
+      destination: `/app/rooms/${activeRoom.id}/send`,
+      headers: {'content-type': 'application/json'},
+      body: JSON.stringify({content: text})
+    });
+
+    // 클라에서도 낙관적 표시(옵션)
+    appendMessage({
+      content: text,
+      senderId: meUserIdentifier ?? meUserId ?? '(me)',
+      sentAt: Date.now(),
+      mine: true
+    });
+
+    msgInputEl.value = '';
+    msgInputEl.focus();
+  }
+
+  // 읽음 이벤트 전송
+  function sendRead() {
+    if (!client || !client.connected) return alert('WS 먼저 연결하세요.');
+    if (!activeRoom) return alert('방을 먼저 선택하세요.');
+    const payload = {readAtEpochMillis: Date.now()};
+    client.publish({
+      destination: `/app/rooms/${activeRoom.id}/read`,
+      headers: {'content-type': 'application/json'},
+      body: JSON.stringify({readAtEpochMillis: Date.now()})
+    });
+  }
+
+  // Events
+  btnFetchRooms.addEventListener('click', fetchRooms);
+  btnConnect.addEventListener('click', connectWs);
+  btnDisconnect.addEventListener('click', disconnectWs);
+  btnSend.addEventListener('click', sendMessage);
+  btnRead.addEventListener('click', sendRead);
+  msgInputEl.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') sendMessage();
+  });
+
+  // Defaults
+  baseUrlEl.value = window.location.origin; // 같은 서버라면 자동
+  setWsStatus(false);
+  setRestStatus('idle');
+</script>
+</body>
+</html>
