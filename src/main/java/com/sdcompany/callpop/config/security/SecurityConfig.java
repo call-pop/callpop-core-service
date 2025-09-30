@@ -40,7 +40,8 @@ public class SecurityConfig {
             "/actuator/**",
             "/api/login",
             "/ws/**",
-            "/h2-console/**"
+            "/h2-console/**",
+            "/chat.html"
     };
 
     @Bean

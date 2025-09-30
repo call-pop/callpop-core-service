@@ -82,8 +82,8 @@
       <div id="messages" class="messages"></div>
       <div class="composer">
         <input id="msgInput" type="text" placeholder="메시지를 입력하세요" style="flex:1" />
-        <button id="btnSend">전송</button>
-        <button id="btnRead" class="ghost">읽음</button>
+        <button id="btnSend" type="button">전송</button>
+        <button id="btnRead" type="button" class="ghost">읽음</button>
       </div>
     </div>
   </main>
@@ -175,7 +175,7 @@
   function appendMessage({content, senderId, sentAt, mine=false}) {
     const bubble = document.createElement('div');
     bubble.className = 'msg' + (mine ? ' me' : '');
-    const time = sentAt ? new Date(sentAt).toLocaleTimeString() : '';
+    const time = sentAt ? new Date(sentAt).toLocaleTimeString() : null;
     bubble.innerHTML = `<div>${escapeHtml(content)}</div>
                         <div class="muted" style="font-size:12px;margin-top:4px;">${escapeHtml(senderId ?? '')} ${time ? '· ' + time : ''}</div>`;
     messagesEl.appendChild(bubble);
@@ -263,14 +263,14 @@
     subs = [];
 
     // 서버는 /topic/rooms/{roomId} 로 메시지 broadcast
-    subs.push(client.subscribe(`/topic/rooms/${room.id}`, (msg) => {
+    subs.push(client.subscribe(`/user/queue/rooms/${room.id}`, (msg) => {
       try {
         const body = JSON.parse(msg.body);
         // 서버 응답 스키마: ChatMessageResponse(id, roomId, content, senderId, sentAtEpochMillis)
         appendMessage({
           content: body.content,
-          senderId: body.senderId,
-          sentAt: body.sentAtEpochMillis,
+          senderId: body.senderName,
+          sentAt: body.sentAt,
           mine: (meUserIdentifier && body.senderId === meUserIdentifier) || (meUserId && body.senderId === String(meUserId))
         });
       } catch {
@@ -279,7 +279,7 @@
     }));
 
     // 읽음 이벤트
-    subs.push(client.subscribe(`/topic/rooms/${room.id}/read`, (msg) => {
+    subs.push(client.subscribe(`/user/queue/rooms/${room.id}/read`, (msg) => {
       console.log('READ event:', msg.body);
     }));
   }
@@ -290,6 +290,7 @@
     if (!activeRoom) return alert('방을 먼저 선택하세요.');
     const text = msgInputEl.value.trim();
     if (!text) return;
+    console.log('Sending message:', text);
 
     const payload = {content: text};
     client.publish({
@@ -328,12 +329,24 @@
   btnDisconnect.addEventListener('click', disconnectWs);
   btnSend.addEventListener('click', sendMessage);
   btnRead.addEventListener('click', sendRead);
+
+  let isComposing = false;
+
+  msgInputEl.addEventListener('compositionstart', () => { isComposing = true; });
+  msgInputEl.addEventListener('compositionend',   () => { isComposing = false; });
+
   msgInputEl.addEventListener('keydown', (e) => {
-    if (e.key === 'Enter') sendMessage();
+    if (e.key === 'Enter' && !e.shiftKey) {
+      // 한글 IME 조합 중이거나 IME keyCode(229)면 무시
+      if (isComposing || e.isComposing || e.keyCode === 229) return;
+      if (e.repeat) return;
+      e.preventDefault();
+      sendMessage();
+    }
   });
 
   // Defaults
-  baseUrlEl.value = window.location.origin; // 같은 서버라면 자동
+  baseUrlEl.value = 'http://10.48.17.184:8080'
   setWsStatus(false);
   setRestStatus('idle');
 </script>

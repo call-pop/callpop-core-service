@@ -7,46 +7,49 @@ import com.sdcompany.callpop.entity.Users;
 import com.sdcompany.callpop.login.dto.CallPopUser;
 import com.sdcompany.callpop.message.dto.ChatMessageRequest;
 import com.sdcompany.callpop.message.dto.ChatMessageResponse;
+import com.sdcompany.callpop.message.dto.MessageSavedEvent;
 import com.sdcompany.callpop.message.dto.ReadReceiptEvent;
+import com.sdcompany.callpop.message.dto.ReadUpdatedEvent;
 import com.sdcompany.callpop.message.repository.ChatMessageRepository;
 import com.sdcompany.callpop.message.repository.ChatRoomRepository;
 import com.sdcompany.callpop.message.repository.RoomMemberRepository;
 import com.sdcompany.callpop.message.repository.UsersRepository;
-import jakarta.transaction.Transactional;
 import lombok.RequiredArgsConstructor;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
+import java.time.Instant;
 
 @Service
 @RequiredArgsConstructor
-public class MessageService {
+public class MessageStompService {
     private final ChatMessageRepository chatMessageRepository;
     private final RoomMemberRepository roomMemberRepository;
     private final ChatRoomRepository chatRoomRepository;
     private final UsersRepository usersRepository;
+    private final ApplicationEventPublisher eventPublisher;
 
     @Transactional
     public ChatMessageResponse saveAndBuildResponse(
             Long roomId,
             ChatMessageRequest request,
-            CallPopUser principal
+            CallPopUser callPopUser
     ) {
 
         ChatRoom room = getChatRoom(roomId);
-        Users user = getUser(principal.getId());
+        Users user = getUser(callPopUser.getId());
 
-        ChatMessage message = ChatMessage.create(
-                room, user, request.content()
-        );
-
+        ChatMessage message = ChatMessage.create(room, user, request.content());
         ChatMessage saved = chatMessageRepository.save(message);
 
-        return new ChatMessageResponse(
-                saved.getId(),
-                roomId,
-                saved.getContent(),
-                saved.getSender().getUserIdentifier(),
-                saved.getSentAt().toEpochMilli()
+        ChatMessageResponse response = new ChatMessageResponse(
+                saved.getId(), roomId, saved.getContent(),
+                saved.getSender().getUsername(), saved.getSentAt()
         );
+
+        eventPublisher.publishEvent(new MessageSavedEvent(roomId, callPopUser.getId(), response));
+        return response;
     }
 
     @Transactional
@@ -60,7 +63,10 @@ public class MessageService {
 
         RoomMember.updateLastRead(member);
 
-        return new ReadReceiptEvent(roomId);
+        ReadReceiptEvent payload = new ReadReceiptEvent(roomId, callPopUser.getId(), Instant.now());
+
+        eventPublisher.publishEvent(new ReadUpdatedEvent(roomId, callPopUser.getId(), payload));
+        return payload;
     }
 
     private RoomMember getMember(ChatRoom room, Users user) {
