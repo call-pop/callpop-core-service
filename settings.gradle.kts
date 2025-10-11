@@ -1,2 +1,2 @@
-rootProject.name = "callpop-core-service"
+rootProject.name = "tadak-app-backend"
 

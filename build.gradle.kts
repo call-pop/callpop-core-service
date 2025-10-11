@@ -5,7 +5,7 @@ plugins {
     id("org.springdoc.openapi-gradle-plugin") version "1.6.0"
 }
 
-group = "com.sdcompany.callpop"
+group = "com.sdcompany.tadak"
 version = "0.0.1"
 
 java {
@@ -43,6 +43,8 @@ dependencies {
 
     runtimeOnly("com.h2database:h2") // 로컬 테스트
     runtimeOnly("org.mariadb.jdbc:mariadb-java-client") // 운영 DB
+
+    compileOnly("org.springframework.boot:spring-boot-devtools")
 
     //jasypt
     implementation("com.github.ulisesbocchio:jasypt-spring-boot-starter:${jasyptVersion}")
