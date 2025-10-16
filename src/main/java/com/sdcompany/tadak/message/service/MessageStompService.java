@@ -31,7 +31,7 @@ public class MessageStompService {
     private final ApplicationEventPublisher eventPublisher;
 
     @Transactional
-    public ChatMessageResponse saveAndBuildResponse(
+    public void saveAndBuildResponse(
             Long roomId,
             ChatMessageRequest request,
             TadakUser tadakUser
@@ -45,15 +45,14 @@ public class MessageStompService {
 
         ChatMessageResponse response = new ChatMessageResponse(
                 saved.getId(), roomId, saved.getContent(),
-                saved.getSender().getUsername(), saved.getSentAt()
+                saved.getSender().getName(), saved.getSentAt()
         );
 
         eventPublisher.publishEvent(new MessageSavedEvent(roomId, tadakUser.getId(), response));
-        return response;
     }
 
     @Transactional
-    public ReadReceiptEvent updateLastReadAndBuildEvent(
+    public void updateLastReadAndBuildEvent(
             Long roomId,
             TadakUser tadakUser
     ) {
@@ -66,7 +65,6 @@ public class MessageStompService {
         ReadReceiptEvent payload = new ReadReceiptEvent(roomId, tadakUser.getId(), Instant.now());
 
         eventPublisher.publishEvent(new ReadUpdatedEvent(roomId, tadakUser.getId(), payload));
-        return payload;
     }
 
     private RoomMember getMember(ChatRoom room, Users user) {

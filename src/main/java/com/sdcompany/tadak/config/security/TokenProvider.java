@@ -27,14 +27,14 @@ public class TokenProvider {
         return Keys.hmacShaKeyFor(jwtConfig.secretKey().getBytes(StandardCharsets.UTF_8));
     }
 
-    public String createToken(Long userId, String userIdentifier) {
+    public String createToken(Long id, String loginId) {
         return Jwts.builder()
                 .signWith(key(), SignatureAlgorithm.HS256)
-                .setSubject(String.valueOf(userId))
+                .setSubject(String.valueOf(id))
                 .setIssuer("tadak")
                 .setIssuedAt(new Date())
                 .setExpiration(Date.from(Instant.now().plus(365, ChronoUnit.DAYS)))
-                .claim("userIdentifier", userIdentifier)
+                .claim("loginId", loginId)
                 .claim("roles", List.of("ROLE_USER"))
                 .compact();
     }

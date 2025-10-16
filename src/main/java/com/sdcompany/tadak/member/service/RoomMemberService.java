@@ -1,4 +1,4 @@
-package com.sdcompany.tadak.member;
+package com.sdcompany.tadak.member.service;
 
 import com.sdcompany.tadak.entity.ChatRoom;
 import com.sdcompany.tadak.message.repository.ChatRoomRepository;

@@ -14,7 +14,7 @@ import org.springframework.web.socket.config.annotation.WebSocketMessageBrokerCo
 public class WebSocketConfig implements WebSocketMessageBrokerConfigurer {
 
     private final JwtAuthChannelInterceptor jwtAuthChannelInterceptor;
-    private static final String[] ENDPOINT = {"/topic", "/queue"};
+    private static final String[] ENDPOINT = {"/topic", "/queue"}; // topic: 1:N, queue: 1:1
     private static final String APP_PREFIX = "/app";
     private static final String USER_PREFIX = "/user";
 

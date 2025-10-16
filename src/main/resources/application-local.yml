@@ -26,6 +26,8 @@ spring:
   sql:
     init:
       mode: always
+      platform: h2
+      data-locations: classpath:data-local.sql
 
 logging:
   pattern:

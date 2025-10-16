@@ -1,4 +1,4 @@
-package com.sdcompany.tadak.message.controller;
+package com.sdcompany.tadak.in.stomp;
 
 import com.sdcompany.tadak.login.dto.TadakUser;
 import com.sdcompany.tadak.message.dto.ChatMessageRequest;

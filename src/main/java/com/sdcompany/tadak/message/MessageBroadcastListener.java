@@ -1,6 +1,6 @@
 package com.sdcompany.tadak.message;
 
-import com.sdcompany.tadak.member.RoomMemberService;
+import com.sdcompany.tadak.member.service.RoomMemberService;
 import com.sdcompany.tadak.message.dto.MessageSavedEvent;
 import com.sdcompany.tadak.message.dto.ReadUpdatedEvent;
 import lombok.RequiredArgsConstructor;
