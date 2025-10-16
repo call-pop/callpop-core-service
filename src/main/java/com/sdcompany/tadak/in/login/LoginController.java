@@ -1,6 +1,7 @@
 package com.sdcompany.tadak.in.login;
 
 import com.sdcompany.tadak.login.dto.LoginRequest;
+import com.sdcompany.tadak.login.dto.LoginResult;
 import com.sdcompany.tadak.login.service.LoginService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -24,7 +25,7 @@ public class LoginController {
             description = "사용자 로그인"
     )
     @PostMapping
-    public void login(@Valid @RequestBody LoginRequest request) {
-        loginService.login(request);
+    public LoginResult login(@Valid @RequestBody LoginRequest request) {
+        return loginService.login(request);
     }
 }
